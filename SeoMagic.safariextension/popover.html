@@ -1,0 +1,421 @@
+<html>
+<head>
+<script type="text/javascript" src="script.js"></script>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<script type="text/javascript">
+	
+	safari.application.addEventListener("popover", siteInfoHandler, true);
+
+	var title;
+	var url;
+	var domen;
+	var urlc;
+	
+	var main_page;
+
+
+function siteInfoHandler(){
+
+
+	// @todo: возможно просто reload сделать
+	if (!main_page) {
+		main_page = document.getElementById('main').innerHTML;
+	} else {
+		document.getElementById('main').innerHTML = main_page;
+	}
+
+
+	title=safari.application.activeBrowserWindow.activeTab.title;;
+
+	url = safari.application.activeBrowserWindow.activeTab.url;
+	urlc = url.replace(/https?:\/\/(www\.)?/g,'');
+	// получаем домен
+	var a      = document.createElement('a');
+    a.href = url;
+    domen = a.hostname;
+    domen = domen.replace('www.','');
+
+    replace_main();
+
+
+	// яндекс индекс через выдачу
+	get_url( "https://yandex.ru/search/?text=site:" + domen, yandex_index);
+
+	// google индекс через выдачу
+	get_url( "https://www.google.ru/search?q=site:" + domen, google_index);
+
+	// яндекс тиц
+	get_url( "http://bar-navig.yandex.ru/u?url=http://"+domen+"&show=1", yandex_tic);
+
+	// информация о сайте
+	get_url( "http://amserver.ru/amextension.php?domen=" + domen, site_info);
+
+}
+
+
+
+
+        // обновляем в коде
+        function replace_main(){
+		    var main = document.getElementById('main');
+		    var str = main.innerHTML;
+		    str = str.replace(/{domen}/g, domen);
+		    str = str.replace(/{url}/g, url);
+		    str = str.replace(/{title}/g, title);
+		    str = str.replace(/{urlc}/g, urlc);
+
+
+		    str = str.replace(/href="(.+?)"/g,'href="$1" onclick="open_url(\'$1\');"');
+
+		    main.innerHTML = str;
+
+		}
+
+
+
+		function open_url(url){
+
+			var targetWin = safari.application.activeBrowserWindow;
+			targetWin.openTab().url = url;
+
+			safari.self.hide();
+
+			//var nwin = safari.application.openTab();
+			//nwin.activeTab.url = url;
+
+			//safari.application.activeBrowserWindow.openTab() = url;
+		}
+
+
+		function yandex_index(str){
+
+			//var found = str.match(/нашлось (.*) ответов/);
+			//var found = str.match(/"found":"(.+?)ответ/);
+			var found = str.match(/(?:нашлось|нашёлся|нашлась)(.+?)(результат|ответ)/);
+			if (found){
+				var yandex_index = found[1];
+				yandex_index  = yandex_index.replace('—\\n','');
+				yandex_index  = yandex_index.replace('тыс.','000');
+				yandex_index  = yandex_index.replace('млн','000000');
+				yandex_index  = yandex_index.replace(/[^\/\d]/g,'');
+			}
+
+			if (str.match(/ничего не нашлось/)){
+				var yandex_index = 0;
+			}
+
+			if (!str || str.match('/captcha/')){
+				var yandex_index='Error';
+			}
+
+			//if (yandex_index!='Error') store_history('yandex_index_'+domen,yandex_index);
+
+			document.getElementById('yandex_index').innerHTML = yandex_index;
+
+			//title_story('yandex_index',domen);
+
+		}
+
+
+	
+
+		function yandex_tic (str){
+			var found = str.match(/tcy rang="([0-9]*)" value="([0-9]*)"/);
+		  	var yandex_tic = found[2];
+
+		  	var yafound = str.match(/url domain="(.*)"/);
+		  	var mirror = yafound[1];
+		  	mirror = mirror.replace(/https:\/\//g, '');
+
+		  	if (mirror && mirror!=domen && mirror!='www.'+domen) document.getElementById('yandex_mirror').innerHTML = '<br><span style="color:black;font-size:11px;">[зеркало: <a style="color:red;" target="_blank" href="http://'+mirror+'">'+mirror+'</a>]</span>';
+
+
+		  	if (found[2]==0 && found[1]==1) yandex_tic='<font color="red">АГС</font>';
+
+				//store_history('yandex_tic_'+domen,yandex_tic);
+
+		  	document.getElementById('yandex_tic').innerHTML = yandex_tic;
+
+				//title_story('yandex_tic',domen);
+
+		}
+
+
+
+		function google_index(str){
+
+			var found = str.match(/(?:примерно|Результатов:) (.+?)</);
+			if (found){
+				var google_index = found[1];
+				google_index  = google_index.replace(/[^\/\d]/g,'');
+			}
+
+			if (str.match(/ничего не найдено/)){
+				var google_index = 0;
+			}
+			if (str=='undefined'){
+				var google_index='Error';
+			}
+
+			if (!str){
+				var google_index='Error';
+			}
+
+			//if (google_index!='Error') store_history('google_index_'+domen,google_index);
+
+			document.getElementById('google_index').innerHTML = google_index;
+
+			//title_story('google_index',domen);
+
+		}
+
+
+function site_info(str){
+			var info = JSON.parse(str);
+			var docinfo = "<a target='_blank' href='https://www.reg.ru/whois/?dname="+info['ip']+"'>"+info['ip']+"</a> <small>["+info['host']+"]</small>";
+			//  && options['show_whois']==true
+			if (info['whois']){
+				//docinfo=docinfo+"<br><a href=''>показать данные whois?</a>";
+
+				var width = getComputedStyle(document.getElementById("main")).width;
+				console.log(width);
+
+				var whois_info = "<pre style='max-width:"+width+"!important;overflow:scroll;font-size:11px;line-height:11px;'>"+info['whois']+"</pre><hr>";
+
+				document.getElementById('site_info').innerHTML = whois_info;
+				//whois_nic(info['whois']);
+
+			// возраст сайта
+			if (info['date_created']){
+				
+				var d1 = new Date(info['date_created']);
+				var dn = new Date();
+
+
+				var dmonth = (dn.getMonth()-d1.getMonth());
+				var dyear = (dn.getFullYear()-d1.getFullYear());
+				var dday = (dn.getDate()-d1.getDate());
+
+				if (dday<0){
+					dday+=30;
+					dmonth-=1;
+				}
+
+				if (dmonth<0) {
+					dmonth+=12;
+					dyear-=1;
+				}
+
+				var result = '';
+
+				if (dyear>0) result = dyear + ' ' + declOfNum(dyear,['год','года','лет']) + ' ';
+				if (dday>0 && dmonth>0) result += dmonth + ' мес. ';
+				result += dday + ' '+declOfNum(dday,['день','дня','дней']);
+
+				result += ' <small>['+d1.getDate()+'.'+(d1.getMonth()<9?'0':'')+''+(d1.getMonth()+1)+'.'+d1.getFullYear()+']</small>';
+
+			}
+
+			document.getElementById('whois_created').innerHTML = result;
+
+
+			}
+			document.getElementById('site_ip').innerHTML = docinfo;
+		}
+
+
+
+	function get_url(url,callfunc){
+
+		var xhr = new XMLHttpRequest();
+		xhr.open("GET", url, true);
+		xhr.onreadystatechange = function() {
+		  if (xhr.readyState == 4) {
+		  	callfunc(xhr.responseText);
+		  }
+		}
+		xhr.send();
+
+	}
+
+
+function declOfNum(number, titles) {
+	    cases = [2, 0, 1, 1, 1, 2];
+	    return titles[ (number%100>4 && number%100<20)? 2 : cases[(number%10<5)?number%10:5] ];
+	}
+
+
+// setting
+
+// Saves options to chrome.storage
+function save_options() {
+	
+  var fontsize = document.getElementById('fontsize').value;
+  var linksbox = document.getElementById('linksbox').value;
+  var checkpage = document.getElementById('checkpage').value;
+  var show_whois = document.getElementById('show_whois').checked;
+
+  // сохраняем
+  var status = document.getElementById('status');
+    status.style="display:block;";
+    status.textContent = 'Изменения сохранены.';
+    setTimeout(function() {
+      status.textContent = '';
+      status.style="display:none";
+    }, 1750);
+
+}
+
+
+</script>
+<style type="text/css">
+#main {
+	font-size:15px;
+	font-family: Georgia;
+	min-width:300px;
+	min-height:200px;
+	line-height: 1.3em;
+}
+#main a {
+	outline:0;
+	text-decoration: none;
+	color:#2c6698;
+}
+
+#yandex_index,#yandex_tic,#pr,#google_index {
+	font-weight:bold;
+	font-size:1.1em;
+}
+
+#main div {
+	padding:2px;
+}
+
+#imgopt {
+	background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAABXUlEQVQ4T8XUuUtdURTF4U8jNlZpgn+AnUIKMWodC40gIQ6F2AgOVYR0DqgRUjg0SbCxCCiEgFMhVmpIlWAVh0rQSitFEBFLQTlyApfHe9xrELzlYe/fXXvtdU6RR/6KHpnnSYDF6EILnuMI3/E733RpCkuxjjosoRL1GMTU/wCHMRAh1fiBEcwU8j5N4QG+YRWHGMVkAjaOTWz/O0sDXqMDv3CFN/gZm8cwgVm8zwoMC/gSm/7iBHPR0yHs4BJNWYA12MJnfEQPevGS+7i1ow0l6EwDvorehM324zbhW9j8C5RFhd0xAfcl+TysxQaW0RdhIYufcIZjVOFDzOLb5A9zgSFnf7ASxwvKAmwezThHeYQu4CtukhHKBYai0NCYUBbOgumvsZ9293OBaziNvj1DEraXBsvnYSsWI6gietWA3SywQkt5Fx+DC0zHG5KV9zTPV2Z1hUZ+ECC3+A7t5UMV81qVOQAAAABJRU5ErkJggg==");
+	no-repeat;
+	height:20px;
+	width:20px;
+	position:fixed;
+	top:4px;
+	right: 8px;
+	cursor:pointer;
+}
+#site_info pre::-webkit-scrollbar{
+	display: none;
+}
+
+
+</style>
+</head>
+<body>
+<div id="setting" style="display:none">
+<h1>Настройки</h1>
+<a href="#" onclick="document.getElementById('setting').style.display='none';document.getElementById('main').style.display='block';return false;">вернуться назад</a>
+
+
+<div class="form-group">
+<label for="fontsize">Размер шрифта:</label>
+<select style="width:300px;" class="form-control" id="fontsize">
+ <option value="13">13</option>
+ <option value="14">14</option>
+ <option value="15">15</option>
+ <option value="16">16</option>
+ <option value="17">17</option>
+ <option value="18">18</option>
+</select>
+</div>
+
+<div class="form-group">
+  <label for="checkpage">Проверять индексацию открытой страницы:</label>
+  <select class="form-control" id="checkpage">
+ <option value="0">не проверять</option>
+ <option value="3">проверять в Yandex и Google</option>
+ <option value="1">проверять только в Yandex</option>
+ <option value="2">проверять только в Google</option>
+  </select>
+</div>
+
+<div class="form-group">
+<label>Дополнительные настройки:</label><br>
+<label class="checkbox-inline"><input id="show_whois" type="checkbox" value="1">Отображать информацию whois</label>
+<!--
+<br>
+<label class="checkbox-inline"><input type="checkbox" value="">Отображать кнопки тиц и liveinternet</label>
+<br>
+<label class="checkbox-inline"><input type="checkbox" value="">Показывать ip адрес домена</label>
+-->
+</div>
+
+<div class="form-group">
+  <label for="linksbox">Панель ссылок:</label><br>
+  <textarea style="width:90%;" class="form-control" rows="12" id="linksbox"></textarea>
+</div>
+
+
+<div class="alert alert-success" id="status" style="display:none;"></div>
+
+<button class="btn btn-danger" id="default">Вернуть по умолчанию</button>
+<button onclick="save_options();" class="btn btn-success" id="save">Сохранить изменения</button>
+
+<hr>
+
+</div>
+
+<div id="main">
+<a target="_blank" onclick="document.getElementById('main').style.display='none';document.getElementById('setting').style.display='block';" href="/options.html" id="imgopt"></a>
+
+<img height="16" src="http://favicon.yandex.net/favicon/{domen}"> <b>{domen}</b><br><br>
+<small>{title} <a target="_blank" href="https://yandex.ru/search/?text={title}">[YA]</a> <a target="_blank" href="https://www.google.ru/search?q={title}">[GO]</a></small>
+<br>
+<hr>
+
+<div>Яндекс: <a target="_blank" href="https://yandex.ru/search/?text=site%3A{domen}"><span id="yandex_index">*</span></a>
+
+<a id='yap' target="_blank" href="https://yandex.ru/yandsearch?text=url%3A{urlc}%20%7C%20url%3Awww.{urlc}">[YAP]</a>
+</div>
+<div>ТИЦ: <a target="_blank" href="http://www.yandex.ru/cy?base=0&host={domen}"><span id="yandex_tic">*</span></a>  <span id="yandex_mirror"></span></div>
+<div>Google: <a target="_blank" href="https://www.google.ru/search?q=site:{domen}"><span id="google_index">*</span></a>
+<a id='gop' target="_blank" href="https://www.google.ru/search?q=site%3A{urlc}">[GOP]</a>
+</div>
+<div>IP: <span id="site_ip">*</span></div>
+<div id='vozrast'>Возраст: <a target="_blank" href="https://www.nic.ru/whois/?domain={domen}"><span id="whois_created">*</span></a></div>
+<hr>
+
+<div>
+<a target="_blank" href="http://www.yandex.ru/cy?base=0&host={domen}"><img src="http://www.yandex.ru/cycounter?{domen}" width="88" height="31" alt="Yandex.CY" border="0"></a>
+
+
+<a href='http://www.liveinternet.ru/?{domen}' target="_blank">
+<img src="http://counter.yadro.ru/hit?t14.1;uhttp%3A//{domen}/" alt="" title="LiveInternet: показано число просмотров за 24 часа, посетителей за 24 часа и за сегодня" border="0" width="88" height="31"></a>
+
+</div>
+
+<hr>
+
+<div id="linksbox">
+<img height="14" src="http://favicon.yandex.net/favicon/developers.google.com">
+<a target="_blank" href="https://developers.google.com/speed/pagespeed/insights/?hl=ru&url={url}">Google Pagespeed Url</a> / <a target="_blank" href="https://developers.google.com/speed/pagespeed/insights/?hl=ru&url={domen}">Domain</a>
+<br>
+<img height="14" src="http://favicon.yandex.net/favicon/keys.so">
+<a target="_blank" href="https://www.keys.so/report?domain={domen}">Keys.so</a>
+<br>
+<img height="14" src="http://favicon.yandex.net/favicon/spywords.ru">
+<a target="_blank" href="http://spywords.ru/sword.php?sword={domen}">Spywords.ru</a>
+<br>
+<img height="14" src="http://favicon.yandex.net/favicon/reg.ru">
+<a target="_blank" href="https://www.reg.ru/whois/?dname={domen}">Whois</a>
+<br>
+<img height="14" src="http://favicon.yandex.net/favicon/{domen}">
+<a target="_blank" href="http://{domen}/robots.txt">Robots.txt</a>
+</div>
+
+<hr>
+<div id="site_info"></div>
+
+</div>
+
+
+
+</body>
+</html>
